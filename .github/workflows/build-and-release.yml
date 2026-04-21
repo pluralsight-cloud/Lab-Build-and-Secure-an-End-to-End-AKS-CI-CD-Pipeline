@@ -1,0 +1,68 @@
+name: Build and Release
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-push:
+    permissions:
+      id-token: write
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Azure login
+      uses: azure/login@v2
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Resolve Azure resources
+      id: azure
+      run: |
+        RG=$(az group list --query [].name --output tsv)
+        ACR=$(az acr list --resource-group "$RG" --query [].name --output tsv)
+        echo "rg=$RG" >> "$GITHUB_OUTPUT"
+        echo "acr=$ACR" >> "$GITHUB_OUTPUT"
+        echo "acr_login_server=${ACR}.azurecr.io" >> "$GITHUB_OUTPUT"
+
+    - name: Build and push container images
+      uses: azure/cli@v2
+      with:
+        azcliversion: latest
+        inlineScript: |
+          ACR="${{ steps.azure.outputs.acr }}"
+          cd frontend
+          az acr build --registry "$ACR" --image "frontend:${GITHUB_RUN_NUMBER}" .
+          cd ../services/cart-service
+          az acr build --registry "$ACR" --image "cart-service:${GITHUB_RUN_NUMBER}" .
+          cd ../product-service
+          az acr build --registry "$ACR" --image "product-service:${GITHUB_RUN_NUMBER}" .
+
+    - name: Update chart values with ACR registry and image tags
+      env:
+        ACR_LOGIN_SERVER: ${{ steps.azure.outputs.acr_login_server }}
+      run: |
+        VALUES=charts/simple-grocery-store/values.yaml
+        sed -E "s|^(  imageRegistry: ).*|\1\"${ACR_LOGIN_SERVER}/\"|" -i "$VALUES"
+        sed -E "/^frontend:/,/^[^[:space:]]/ s/(tag: ).*/\1\"${GITHUB_RUN_NUMBER}\"/" -i "$VALUES"
+        sed -E "/^cartService:/,/^[^[:space:]]/ s/(tag: ).*/\1\"${GITHUB_RUN_NUMBER}\"/" -i "$VALUES"
+        sed -E "/^productService:/,/^[^[:space:]]/ s/(tag: ).*/\1\"${GITHUB_RUN_NUMBER}\"/" -i "$VALUES"
+        echo "---- values.yaml ----"
+        cat "$VALUES"
+
+    - name: Package and push Helm chart to ACR
+      env:
+        ACR_NAME: ${{ steps.azure.outputs.acr }}
+        ACR_LOGIN_SERVER: ${{ steps.azure.outputs.acr_login_server }}
+      run: |
+        TOKEN=$(az acr login --name "$ACR_NAME" --expose-token --query accessToken --output tsv)
+        helm registry login "$ACR_LOGIN_SERVER" \
+          --username 00000000-0000-0000-0000-000000000000 \
+          --password "$TOKEN"
+        helm package charts/simple-grocery-store --destination .
+        helm push simple-grocery-store-*.tgz "oci://${ACR_LOGIN_SERVER}/helm"
+        helm registry logout "$ACR_LOGIN_SERVER"

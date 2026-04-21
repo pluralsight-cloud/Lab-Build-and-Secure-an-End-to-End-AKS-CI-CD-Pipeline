@@ -1,0 +1,73 @@
+name: trivy
+
+on:
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    permissions:
+      contents: read # for actions/checkout to fetch code
+      security-events: write # for github/codeql-action/upload-sarif to upload SARIF results
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build container images from Dockerfile
+        run: |
+          cd frontend
+          docker build -t frontend .
+          cd ../services/cart-service
+          docker build -t cart-service .
+          cd ../product-service
+          docker build -t product-service .
+
+      - name: Run Trivy vulnerability scanner on frontend
+        uses: aquasecurity/trivy-action@7b7aa264d83dc58691451798b4d117d53d21edfe
+        with:
+          image-ref: 'frontend'
+          format: 'template'
+          template: '@/contrib/sarif.tpl'
+          output: 'trivy-results-frontend.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy scan results to GitHub Security tab for frontend
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results-frontend.sarif'
+          category: 'trivy-frontend'
+
+      - name: Run Trivy vulnerability scanner on cart-service
+        uses: aquasecurity/trivy-action@7b7aa264d83dc58691451798b4d117d53d21edfe
+        with:
+          image-ref: 'cart-service'
+          format: 'template'
+          template: '@/contrib/sarif.tpl'
+          output: 'trivy-results-cart-service.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy scan results to GitHub Security tab for cart-service
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results-cart-service.sarif'
+          category: 'trivy-cart-service'
+
+      - name: Run Trivy vulnerability scanner on product-service 
+        uses: aquasecurity/trivy-action@7b7aa264d83dc58691451798b4d117d53d21edfe
+        with:
+          image-ref: 'product-service'
+          format: 'template'
+          template: '@/contrib/sarif.tpl'
+          output: 'trivy-results-product-service.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy scan results to GitHub Security tab for product-service 
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results-product-service.sarif'
+          category: 'trivy-product-service'

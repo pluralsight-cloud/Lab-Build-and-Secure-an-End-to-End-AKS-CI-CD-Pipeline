@@ -152,3 +152,5 @@ commonLabels:
   app.kubernetes.io/instance: simple-grocery-store
   app.kubernetes.io/version: "1.0.0"
   app.kubernetes.io/managed-by: Helm
+  global:
+  imageRegistry: "acrzakzng7ab6.azurecr.io/"

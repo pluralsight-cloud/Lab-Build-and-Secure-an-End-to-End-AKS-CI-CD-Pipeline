@@ -2,7 +2,7 @@
 
 # Global settings
 global:
-  imageRegistry: ""
+  imageRegistry: "acrl4but4foru.azurecr.io"
 
 # Product service configuration
 productService:

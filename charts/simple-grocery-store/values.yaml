@@ -2,7 +2,7 @@
 
 # Global settings
 global:
-  imageRegistry: ""
+  imageRegistry: "acr3xi275rmff.azurecr.io/"
 
 # Product service configuration
 productService:

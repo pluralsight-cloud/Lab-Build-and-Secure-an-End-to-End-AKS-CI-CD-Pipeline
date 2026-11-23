@@ -1,0 +1,256 @@
+---
+# Source: simple-grocery-store/templates/cart-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: cart-service
+  labels:
+    app: cart-service
+  app.kubernetes.io/name: simple-grocery-store
+  app.kubernetes.io/instance: release-name
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5002
+    targetPort: 5002
+    protocol: TCP
+    name: http
+  selector:
+    app: cart-service
+  app.kubernetes.io/name: simple-grocery-store
+  app.kubernetes.io/instance: release-name
+---
+# Source: simple-grocery-store/templates/frontend-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+  labels:
+    app: frontend
+  app.kubernetes.io/name: simple-grocery-store
+  app.kubernetes.io/instance: release-name
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+    name: http
+  selector:
+    app: frontend
+  app.kubernetes.io/name: simple-grocery-store
+  app.kubernetes.io/instance: release-name
+---
+# Source: simple-grocery-store/templates/product-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: product-service
+  labels:
+    app: product-service
+  app.kubernetes.io/name: simple-grocery-store
+  app.kubernetes.io/instance: release-name
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5001
+    targetPort: 5001
+    protocol: TCP
+    name: http
+  selector:
+    app: product-service
+  app.kubernetes.io/name: simple-grocery-store
+  app.kubernetes.io/instance: release-name
+---
+# Source: simple-grocery-store/templates/cart-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cart-deployment
+  labels:
+    app: cart-service
+    app.kubernetes.io/name: simple-grocery-store
+    app.kubernetes.io/instance: release-name
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cart-service
+      app.kubernetes.io/name: simple-grocery-store
+      app.kubernetes.io/instance: release-name
+  template:
+    metadata:
+      labels:
+        app: cart-service
+        app.kubernetes.io/name: simple-grocery-store
+        app.kubernetes.io/instance: release-name
+    spec:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 3000
+        fsGroup: 2000
+      containers:
+      - name: cart-service
+        image: "cart-service:latest"
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5002
+          name: http
+          protocol: TCP
+        env:
+        - name: NODE_ENV
+          value: "production"
+        livenessProbe:
+          httpGet:
+            path: /api/cart
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/cart
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        resources:
+          limits:
+            cpu: 300m
+            memory: 256Mi
+          requests:
+            cpu: 150m
+            memory: 128Mi
+        securityContext:
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          capabilities:
+            drop:
+              - ALL
+---
+# Source: simple-grocery-store/templates/frontend-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-deployment
+  labels:
+    app: frontend
+    app.kubernetes.io/name: simple-grocery-store
+    app.kubernetes.io/instance: release-name
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+      app.kubernetes.io/name: simple-grocery-store
+      app.kubernetes.io/instance: release-name
+  template:
+    metadata:
+      labels:
+        app: frontend
+        app.kubernetes.io/name: simple-grocery-store
+        app.kubernetes.io/instance: release-name
+    spec:
+      containers:
+      - name: frontend
+        image: "frontend:latest"
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 80
+          name: http
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        resources:
+          limits:
+            cpu: 200m
+            memory: 256Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+---
+# Source: simple-grocery-store/templates/product-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-deployment
+  labels:
+    app: product-service
+    app.kubernetes.io/name: simple-grocery-store
+    app.kubernetes.io/instance: release-name
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: product-service
+      app.kubernetes.io/name: simple-grocery-store
+      app.kubernetes.io/instance: release-name
+  template:
+    metadata:
+      labels:
+        app: product-service
+        app.kubernetes.io/name: simple-grocery-store
+        app.kubernetes.io/instance: release-name
+    spec:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 3000
+        fsGroup: 2000
+      containers:
+      - name: product-service
+        image: "product-service:latest"
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5001
+          name: http
+          protocol: TCP
+        env:
+        - name: NODE_ENV
+          value: "production"
+        livenessProbe:
+          httpGet:
+            path: /api/products
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/products
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 250m
+            memory: 256Mi
+        securityContext:
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          capabilities:
+            drop:
+              - ALL
